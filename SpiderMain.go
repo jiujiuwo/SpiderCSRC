@@ -6,10 +6,32 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 )
 
+type xingZhengChuFa struct {
+	uint64 int
+	indexNum string
+	sort string
+	issuer string
+	issueDate string
+	issueNum string
+	keywords string
+	content string
+	createdTime time.Time
+
+}
+
+var urlToNameMap = make(map[string]string)
+var xingZhengChuFaUrl = "http://www.csrc.gov.cn/pub/zjhpublic"
+
+
+func getXingZhengChuFaContent(){
+
+}
+
 func getXingZhengChuFaList(xingZhengChuFaListUrl string) {
-	urlToNameMap :=make(map[string]string)
+
 
 	resp, err := http.Get(xingZhengChuFaListUrl)
 	if err != nil {
@@ -25,19 +47,19 @@ func getXingZhengChuFaList(xingZhengChuFaListUrl string) {
 	if resp.StatusCode == http.StatusOK {
 		html, err := ioutil.ReadAll(resp.Body)
 		result := pattern.FindAll(html,-1)
-		if err != nil {
+		if err != nil || len(result)<=0{
+			fmt.Println("匹配的url地址数为：%d",result)
 			panic(err)
 		} else {
-			fmt.Println(len(result))
 			for index,item := range(result){
 				line := string(item)
 				index1 := strings.Index(line,"..")
 				index2 := strings.Index(line,".htm")
-				key := line[index1+1:index2]
+				key := line[index1+5:index2+4]
 				index3 := strings.Index(line,";\">")
 				index4:=strings.Index(line,"</a>")
 				value :=line[index3+3:index4]
-				urlToNameMap[key]=value
+				urlToNameMap[key]=strings.TrimSpace(value)
 				fmt.Printf("%d,%s\n",index,line)
 			}
 		}
