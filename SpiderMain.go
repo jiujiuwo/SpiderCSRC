@@ -187,28 +187,19 @@ func filterXingZhengChuFa2(item *XingZhengChuFaItem, html []byte) {
 		item.issueNum = issueNum[start+6:end]
 	}
 	//提取内容
-	contentPattern, err := regexp.Compile("<P(.|d)*<SPAN(.|d)*</SPAN>(.|d)*</P>")
+	contentPattern, err := regexp.Compile("<FONT.*</FONT>")
 	if err != nil {
 		panic(err)
 	}
-	//var content string
+	var content string
 	contents := contentPattern.FindAll(html,-1)
 	for _,per := range(contents){
 		tmp  := string(per)
-/*		if -1==strings.Index(tmp,"</FONT>"){
-			start = strings.Index(tmp,"10.5pt\">")
-			end = strings.Index(tmp,"</SPAN>")
-			if !indexOutOfS(tmp,start,end){
-				content+=tmp[start:end]
-			}
-		}else{
-			start = strings.Index(tmp,"0>")
-			end = strings.Index(tmp,"</FONT>")
-			if !indexOutOfS(tmp,start,end){
-				content+=tmp[start:end]
-			}
-		}*/
-		//item.content = content
+		start = strings.Index(tmp,">")
+		end = strings.Index(tmp,"</FONT>")
+		if !indexOutOfS(tmp,start,end){
+			content+=tmp[start:end]
+		}
 		fmt.Println(tmp)
 	}
 }
@@ -224,6 +215,8 @@ func indexOutOfS(s string,start int,end int) bool{
 	}
 	return false
 }
+
+
 func main() {
 	getXingZhengChuFaList("http://www.csrc.gov.cn/pub/zjhpublic/3300/3313/./index_7401.htm")
 	getXingZhengChuFaDetail(urlToNameMap)
