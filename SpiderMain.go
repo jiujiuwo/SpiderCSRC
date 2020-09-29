@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -23,11 +23,15 @@ type XingZhengChuFaItem struct {
 	createdTime time.Time
 }
 
-var urlToNameMap = make(map[string]string)
 var xingZhengChuFaUrl = "http://www.csrc.gov.cn/pub/zjhpublic"
 
-func getXingZhengChuFaList(xingZhengChuFaListUrl string) {
+/*
+	获取行政处罚每一页的列表内容，提取其连接
+*/
+func getXingZhengChuFaList(xingZhengChuFaListUrl string) (map[string]string, error) {
 
+	var urlToNameMap = make(map[string]string)
+	fmt.Println(xingZhengChuFaListUrl)
 	resp, err := http.Get(xingZhengChuFaListUrl)
 	if err != nil {
 		panic(err)
@@ -58,6 +62,7 @@ func getXingZhengChuFaList(xingZhengChuFaListUrl string) {
 			}
 		}
 	}
+	return urlToNameMap, err
 }
 
 /*
@@ -65,11 +70,13 @@ func getXingZhengChuFaList(xingZhengChuFaListUrl string) {
 */
 func getXingZhengChuFaDetail(urlMaps map[string]string) {
 
-	for key, value := range urlMaps {
-		file, err := os.Create("./" + value)
-		if err != nil {
-			fmt.Println("创建文件出错" + err.Error())
-		}
+	for key, _ := range urlMaps {
+
+		/*		file, err := os.Create("./" + value)
+				if err != nil {
+					fmt.Println("创建文件出错" + err.Error())
+				}*/
+
 		resp, err := http.Get(xingZhengChuFaUrl + key)
 		if err != nil {
 			panic(err)
@@ -80,8 +87,8 @@ func getXingZhengChuFaDetail(urlMaps map[string]string) {
 				panic(err)
 			}
 			filterXingZhengChuFa(html)
-			file.Write(html)
-			file.Close()
+			/*			file.Write(html)
+						file.Close()*/
 		}
 	}
 }
@@ -99,10 +106,9 @@ func filterXingZhengChuFa(html []byte) {
 	indexNum := string(indexNumPattern.Find(html))
 	start := strings.Index(indexNum, "</B>")
 	end := strings.Index(indexNum, "</td>")
-	if !indexOutOfS(indexNum,start,end){
+	if !indexOutOfS(indexNum, start, end) {
 		item.indexNum = indexNum[start+4 : end]
 	}
-
 
 	//提取分类
 	sortPattern, err := regexp.Compile("<span id=\"lSubcat\">.*&nbsp;;&nbsp;.*</span>")
@@ -112,7 +118,7 @@ func filterXingZhengChuFa(html []byte) {
 	sort := string(sortPattern.Find(html))
 	start = strings.Index(sort, "\">")
 	end = strings.Index(sort, "</span>")
-	if !indexOutOfS(sort,start,end){
+	if !indexOutOfS(sort, start, end) {
 		sort = sort[start+2 : end]
 	}
 	sort = strings.ReplaceAll(sort, "&nbsp;", "")
@@ -126,13 +132,12 @@ func filterXingZhengChuFa(html []byte) {
 	issuer := string(issuserPattern.Find(html))
 	start = strings.Index(issuer, "<span>")
 	end = strings.Index(issuer, "</span>")
-	if !indexOutOfS(issuer,start,end){
+	if !indexOutOfS(issuer, start, end) {
 		item.issuer = issuer[start+6 : end]
 	}
 	//提取其他内容
 	filterXingZhengChuFa2(&item, html)
 	item.createdTime = time.Now()
-	fmt.Println(item)
 }
 
 /*
@@ -147,7 +152,7 @@ func filterXingZhengChuFa2(item *XingZhengChuFaItem, html []byte) {
 	datetime := string(datePattern.Find(html))
 	start := strings.Index(datetime, "<span>")
 	end := strings.Index(datetime, "</span>")
-	if !indexOutOfS(datetime,start,end){
+	if !indexOutOfS(datetime, start, end) {
 		item.issueDate = datetime[start+6 : end]
 	}
 
@@ -159,8 +164,8 @@ func filterXingZhengChuFa2(item *XingZhengChuFaItem, html []byte) {
 	name := string(namePattern.Find(html))
 	start = strings.Index(name, "<span")
 	end = strings.Index(name, "</span>")
-	if !indexOutOfS(name,start,end){
-		item.name = name[start+18:end]
+	if !indexOutOfS(name, start, end) {
+		item.name = name[start+18 : end]
 	}
 
 	//提取文号
@@ -171,8 +176,8 @@ func filterXingZhengChuFa2(item *XingZhengChuFaItem, html []byte) {
 	keywords := string(keywordsPattern.Find(html))
 	start = strings.Index(keywords, "<span>")
 	end = strings.Index(keywords, "</span>")
-	if !indexOutOfS(datetime,start,end){
-		item.keywords = keywords[start+6:end]
+	if !indexOutOfS(datetime, start, end) {
+		item.keywords = keywords[start+6 : end]
 	}
 
 	//提取主题词
@@ -183,41 +188,63 @@ func filterXingZhengChuFa2(item *XingZhengChuFaItem, html []byte) {
 	issueNum := string(issueNumPattern.Find(html))
 	start = strings.Index(issueNum, "<span>")
 	end = strings.Index(issueNum, "</span>")
-	if !indexOutOfS(issueNum,start,end){
-		item.issueNum = issueNum[start+6:end]
+	if !indexOutOfS(issueNum, start, end) {
+		item.issueNum = issueNum[start+6 : end]
 	}
 	//提取内容
-	contentPattern, err := regexp.Compile("<FONT.*</FONT>")
+	contentPattern, err := regexp.Compile("<P(.|d)*</P>")
 	if err != nil {
 		panic(err)
 	}
-	var content string
-	contents := contentPattern.FindAll(html,-1)
-	for _,per := range(contents){
-		tmp  := string(per)
-		start = strings.Index(tmp,">")
-		end = strings.Index(tmp,"</FONT>")
-		if !indexOutOfS(tmp,start,end){
-			content+=tmp[start:end]
+	contents := contentPattern.FindAll(html, -1)
+	var result string
+	for _, per := range contents {
+		tmp := string(per)
+		htmlTag, err := regexp.Compile("</FONT>|</SPAN>|</P>")
+		if err != nil {
+			panic(err)
 		}
-		fmt.Println(tmp)
+		tmp = htmlTag.ReplaceAllString(tmp, "")
+		htmlTag, err = regexp.Compile("<.*?>")
+		if err != nil {
+			panic(err)
+		}
+		tmp = htmlTag.ReplaceAllString(tmp, "")
+		tmp = strings.ReplaceAll(tmp, "&nbsp;", " ")
+		result += tmp
 	}
+	item.content = result
 }
+
 /*
 	判断截取的字符串是否越界
- */
-func indexOutOfS(s string,start int,end int) bool{
-	if start<0||end<0{
+*/
+func indexOutOfS(s string, start int, end int) bool {
+	if start < 0 || end < 0 {
 		return true
 	}
-	if start>len(s)||end>len(s){
+	if start > len(s) || end > len(s) {
 		return true
 	}
 	return false
 }
 
-
 func main() {
-	getXingZhengChuFaList("http://www.csrc.gov.cn/pub/zjhpublic/3300/3313/./index_7401.htm")
-	getXingZhengChuFaDetail(urlToNameMap)
+	var urlMap map[string]string
+	var err error
+	for i := 0; err == nil; i++ {
+		if 0 == i {
+			urlMap, err = getXingZhengChuFaList("http://www.csrc.gov.cn/pub/zjhpublic/3300/3313/./index_7401.htm")
+		} else {
+			fmt.Println(i)
+			urlMap, err = getXingZhengChuFaList("http://www.csrc.gov.cn/pub/zjhpublic/3300/3313/./index_7401" + "_" + strconv.Itoa(i)+ ".htm")
+		}
+		if err != nil {
+			panic(err)
+			break
+		}
+		//fmt.Println(urlMap)
+		getXingZhengChuFaDetail(urlMap)
+	}
+
 }
