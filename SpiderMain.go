@@ -2,8 +2,10 @@ package main
 
 import (
 	"fmt"
+	_ "github.com/go-sql-driver/mysql"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -24,6 +26,9 @@ type XingZhengChuFaItem struct {
 }
 
 var xingZhengChuFaUrl = "http://www.csrc.gov.cn/pub/zjhpublic"
+
+//数据库连接类
+var mysqlCon = MySqlCon{}
 
 /*
 	获取行政处罚每一页的列表内容，提取其连接
@@ -61,6 +66,8 @@ func getXingZhengChuFaList(xingZhengChuFaListUrl string) (map[string]string, err
 				urlToNameMap[key] = strings.TrimSpace(value)
 			}
 		}
+	} else {
+		os.Exit(-1)
 	}
 	return urlToNameMap, err
 }
@@ -214,6 +221,7 @@ func filterXingZhengChuFa2(item *XingZhengChuFaItem, html []byte) {
 		result += tmp
 	}
 	item.content = result
+	mysqlCon.Insert(item)
 }
 
 /*
@@ -229,7 +237,9 @@ func indexOutOfS(s string, start int, end int) bool {
 	return false
 }
 
-func main() {
+func startSpider() {
+	//数据库操作封装对象
+	mysqlCon.InitCon("root", "root", "localhost:3306", "csrc_spider")
 	var urlMap map[string]string
 	var err error
 	for i := 0; err == nil; i++ {
@@ -237,7 +247,7 @@ func main() {
 			urlMap, err = getXingZhengChuFaList("http://www.csrc.gov.cn/pub/zjhpublic/3300/3313/./index_7401.htm")
 		} else {
 			fmt.Println(i)
-			urlMap, err = getXingZhengChuFaList("http://www.csrc.gov.cn/pub/zjhpublic/3300/3313/./index_7401" + "_" + strconv.Itoa(i)+ ".htm")
+			urlMap, err = getXingZhengChuFaList("http://www.csrc.gov.cn/pub/zjhpublic/3300/3313/./index_7401" + "_" + strconv.Itoa(i) + ".htm")
 		}
 		if err != nil {
 			panic(err)
@@ -245,6 +255,11 @@ func main() {
 		}
 		//fmt.Println(urlMap)
 		getXingZhengChuFaDetail(urlMap)
+		//10秒钟执行一次
+		time.Sleep(1000*1000*1000*10)
+		fmt.Println(time.Now())
 	}
-
+}
+func main() {
+	startSpider()
 }
